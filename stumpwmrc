@@ -1,0 +1,189 @@
+;; -*-lisp-*-
+;debian=sbcl
+(in-package :stumpwm-user)
+
+;; StumpWM doesn't really support this sort of font yet
+;; (set-font "Source Code Pro:pixelsize=18:antialias=true:autohint=true")
+
+(ql:quickload :swank)
+
+(let ((server-running nil))
+  (defcommand swank () ()
+    "Toggle the swank server on/off"
+    (if server-running
+        (progn
+          (swank:stop-server 4005)
+          (echo-string
+           (current-screen)
+           "Stopping swank.")
+          (setf server-running nil))
+        (progn
+          (swank:create-server :port 4005
+                               :style swank:*communication-style*
+                               :dont-close t)
+          (echo-string
+           (current-screen)
+           "Starting swank. M-x slime-connect RET RET, then (in-package stumpwm).")
+          (setf server-running t))))
+
+  (defcommand quit-slime () ()
+              (when server-running
+                (swank:stop-server 4005)
+                (setf server-running nil))))
+
+(handler-case (swank)
+  (sb-bsd-sockets:address-in-use-error () (continue)))
+
+(define-key *top-map* (kbd "s-w") "windows")
+(define-key *top-map* (kbd "s-!") "exec")
+
+(set-prefix-key (kbd "C-1"))
+
+(setf *mouse-focus-policy* :click) ;; :click, :ignore, :sloppy
+
+(defcommand chromium () ()
+  "run chromium"
+  (run-or-raise "chromium-browser" '(:instance "Chromium")))
+
+(defcommand iceweasel () ()
+  "run iceweasel"
+  (run-or-raise "iceweasel" '(:instance "Navigator")))
+
+(define-key *top-map* (kbd "C-M-6") "iceweasel")
+
+(defcommand emacs () ()
+  "run emacs"
+  (run-or-raise "/usr/local/bin/emacsclient -c" '(:instance "emacs")))
+
+(defcommand urxvt () ()
+            "Start an urxvt instance or switch to it, if it is already running."
+            (run-or-raise "urxvt" '(:instance "urxvt")))
+
+(define-key *root-map* (kbd "c") "urxvt")
+
+(defcommand gnome-terminal () ()
+            "Start an gnome-terminal instance or switch to it, if it is already running."
+            (run-or-raise "gnome-terminal" '(:instance "gnome-terminal")))
+
+(define-key *root-map* (kbd "c") "gnome-terminal")
+
+(defcommand stterm () ()
+  "Start an stterm or switch to it, if it is already running."
+  (run-or-raise "st -c stterm-buhl -e tmux attach" '(:instance "stterm-buhl")))
+
+(define-key *root-map* (kbd "c") "stterm")
+
+(defcommand suspend-dunst ()()
+            "Suspend dunst notifications"
+            (run-shell-command "killall -SIGUSR1 dunst"))
+
+(defcommand resume-dunst ()()
+            "Resume dunst notifications"
+            (run-shell-command "killall -SIGUSR2 dunst"))
+
+(defcommand lock-screen () ()
+    (run-shell-command "xscreensaver-command -lock"))
+
+(define-key *top-map* (kbd "s-l") "lock-screen")
+
+(defvar *screen-map* (make-sparse-keymap))
+
+(define-key *root-map* (kbd "/") '*screen-map*)
+
+(defcommand home-display-layout () ()
+  "Switch to my home display setup (portrait + laptop)"
+  (run-shell-command "/home/buhl/.screenlayout/home.sh"))
+
+(defcommand office-display-layout () ()
+  "Switch to my office display setup (portrait + landscape)"
+  (run-shell-command "/home/buhl/.screenlayout/office.sh"))
+
+(defcommand standalone-display-layout () ()
+  "Switch to laptop-only display"
+  (run-shell-command "/home/buhl/.screenlayout/standalone.sh"))
+
+(defcommand conference-room-display-layout () ()
+            "Switch to conference-room display"
+            (run-shell-command "/home/buhl/.screenlayout/conference-room.sh"))
+
+(define-key *screen-map* (kbd "h") "home-display-layout")
+(define-key *screen-map* (kbd "o") "office-display-layout")
+(define-key *screen-map* (kbd "s") "standalone-display-layout")
+(define-key *screen-map* (kbd "c") "conference-room-display-layout")
+
+;;(run-shell-command "/home/buhl/bin/xflux -z 80203 -r 1")
+
+(defvar !run-once! nil)
+
+;; consider running dbus-launch and setting vars…
+
+(unless !run-once!
+  (run-shell-command "redshift -l 39.615186:-104.895381")
+
+  (run-shell-command "nm-applet --sm-disable")
+  (run-shell-command "xbacklight -set 100")
+  (run-shell-command "xscreensaver")
+  (setf !run-once! t))
+
+(run-shell-command "feh --bg-tile ~/Pictures/geomatrix.png")
+
+(run-shell-command "gpg-agent --daemon --write-env-file /home/buhl/.gpg-agent-info")
+(with-open-file (foo "~/.gpg-agent-info")
+  (loop for line = (read-line foo nil)
+     while line
+     for equal-sign = (position #\= line)
+     when equal-sign
+     do (setf (getenv (subseq line 0 equal-sign)) (subseq line (1+ equal-sign)))))
+
+;; dbus-send --system --print-reply     --dest="org.freedesktop.UPower"     /org/freedesktop/UPower     org.freedesktop.UPower.Suspend
+
+;; the mode-line is kinda nice
+(setf *screen-mode-line-format* "%d [^B%n^b] %W"
+      *time-modeline-string* "%d %b %y %H:%M"
+      *mode-line-timeout* 15)
+
+;; let's enable it everywhere
+(defun enable-all-mode-lines ()
+  (loop for screen in *screen-list*
+        do (loop for head in (screen-heads screen)
+                 do (enable-mode-line screen head t))))
+
+(enable-all-mode-lines)
+
+(defvar !old-group-sync-all-heads!
+  (first (remove-if-not
+          #'(lambda (x) (and (equalp (sb-mop:method-qualifiers x) '(:after))
+                             (equalp (sb-mop:method-specializers x) (list (find-class 'group)))))
+          (sb-mop:generic-function-methods #'group-sync-all-heads))))
+
+;; update mode lines when the screen heads change
+
+(defmethod group-sync-all-heads :after ((group group))
+  (when !old-group-sync-all-heads!
+    (funcall !old-group-sync-all-heads! group))
+  (enable-all-mode-lines))
+
+;; use Zenburn colours
+;; default: ("black" "red" "green" "yellow" "blue" "magenta" "cyan" "white")
+(setf *colors* '("#3f3f3f" "#cc9393" "#7f9f7f" "#f0dfaf"
+                 "#8cd0d3" "#dc8cc3" "#93e0e3" "#dcdccc"))
+(update-color-map (current-screen))
+
+(let (;;(foreground-colour "darkseagreen1")
+      (foreground-colour "#dcdccc")
+      ;;(background-colour "grey25")
+      (background-colour "#3f3f3f")
+      ;;(border-colour "grey26")
+      (border-colour "#2b2b2b")
+      ;;(focus-colour "darkseagreen4")
+      (focus-colour "#4f4f4f")
+      ;;(unfocus-colour "grey25")
+      (unfocus-colour "#383838"))
+  (set-fg-color foreground-colour)
+  (set-border-color foreground-colour)
+  (set-focus-color focus-colour)
+  (set-unfocus-color unfocus-colour)
+  (set-msg-border-width 1)
+  (setf *mode-line-foreground-color* "#5f5f5f"
+        *mode-line-background-color* "#2b2b2b"
+        *mode-line-border-color* border-colour))
