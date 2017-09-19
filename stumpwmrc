@@ -2,11 +2,23 @@
 ;debian=sbcl
 (in-package :stumpwm-user)
 
+(require :asdf)
+
+     ;;; If a fasl was stale, try to recompile and load (once).
+(defmethod asdf:perform :around ((o asdf:load-op)
+                                 (c asdf:cl-source-file))
+  (handler-case (call-next-method o c)
+    ;; If a fasl was stale, try to recompile and load (once).
+    (sb-ext:invalid-fasl ()
+      (asdf:perform (make-instance 'asdf:compile-op) c)
+      (call-next-method))))
+
 (ql:quickload '(:clx-truetype
                 :ttf-fonts
                 :split-sequence
                 :bordeaux-threads
-                :dbus))
+                :dbus
+                "local-time"))
 
 (set-font (make-instance 'xft:font :family "Source Code Pro Semibold" :subfamily "Regular" :size 12))
 
@@ -32,9 +44,9 @@
           (setf server-running t))))
 
   (defcommand quit-swank () ()
-              (when server-running
-                (swank:stop-server 4005)
-                (setf server-running nil)))
+    (when server-running
+      (swank:stop-server 4005)
+      (setf server-running nil)))
 
   (add-hook *quit-hook* (lambda () (when server-running (swank:stop-server 4005))))
   (add-hook stumpwm::*restart-hook* (lambda () (when server-running (swank:stop-server 4005)))))
@@ -55,7 +67,9 @@
 
 (defcommand firefox () ()
   "run firefox"
-  (run-or-raise "firefox" '(:class "Firefox")))
+  (if (string= (group-name (current-group)) "AIaaS")
+      (run-or-raise "firefox -new-instance -P \"AIaaS\" --class \"Firefox-AIaaS\"" '(:class "Firefox-AIaaS"))
+      (run-or-raise "firefox -new-instance -P \"Reset\" --class \"Firefox-Default\"" '(:class "Firefox-Default"))))
 
 (define-key *top-map* (kbd "C-M-6") "firefox")
 
@@ -82,12 +96,12 @@
   (run-or-raise "pidgin" '(:class "Pidgin" :role "buddy_list")))
 
 (defcommand start-emacs () ()
-            "start emacs dæmon"
-            (run-shell-command "emacs --daemon"))
+  "start emacs dæmon"
+  (run-shell-command "emacs --daemon"))
 
 (defcommand stop-emacs () ()
-            "stop emacs dæmon"
-            (run-shell-command "emacsclient -e '(save-buffers-kill-emacs)'"))
+  "stop emacs dæmon"
+  (run-shell-command "emacsclient -e '(save-buffers-kill-emacs)'"))
 
 (start-emacs)
 
@@ -97,7 +111,9 @@
 
 (defcommand emacs () ()
   "run emacs"
-  (run-or-raise "/usr/local/bin/emacsclient -c -a ''" '(:instance "emacs")))
+  (if (string= (group-name (current-group)) "AIaaS")
+      (run-or-raise "/usr/local/bin/emacsclient -c -F '((name . \"emacs-aiaas\"))' -a ''" '(:instance "emacs-aiaas"))
+      (run-or-raise "/usr/local/bin/emacsclient -c -a ''" '(:instance "emacs"))))
 
 (defcommand conkeror () ()
   "run conkeror"
@@ -108,7 +124,7 @@
 #|
 ;; Show time, cpu usage and network traffic in the modeline
 (setf *screen-mode-line-format*
-(list '(:eval (run-shell-command "date '+%R, %F %a'|tr -d [:cntrl:]" t)) " | %t | %c| %l | [^B%n^b] %W"))
+      (list '(:eval (run-shell-command "date '+%R, %F %a'|tr -d [:cntrl:]" t)) " | %t | %c| %l | [^B%n^b] %W"))
 
 (define-key *top-map* (kbd "M-4") "emacs")
 (define-key *top-map* (kbd "M-F9") "loadrc")
@@ -146,7 +162,10 @@
 (define-key *root-map* (kbd "c") "gnome-terminal")
 (defcommand stterm () ()
   "Start an stterm or switch to it, if it is already running."
-  (run-or-raise "st -c stterm-buhl -e tmux attach" '(:class "stterm-buhl")))
+  (if (string= (group-name (current-group)) "AIaaS")
+      (run-or-raise "st -c stterm-buhl -n \"AIaaS\" -e tmux new-session -A -s aiaas" '(:class "stterm-buhl" :instance "AIaaS"))
+      (run-or-raise "st -c stterm-buhl -n \"Default\"  -e tmux new-session -A" '(:class "stterm-buhl" :instance "Default"))))
+
 (define-key *root-map* (kbd "c") "stterm")
 
 (defcommand suspend-dunst ()()
@@ -182,8 +201,8 @@
   (run-shell-command "/home/buhl/.screenlayout/standalone.sh"))
 
 (defcommand conference-room-display-layout () ()
-            "Switch to conference-room display"
-            (run-shell-command "/home/buhl/.screenlayout/conference-room.sh"))
+  "Switch to conference-room display"
+  (run-shell-command "/home/buhl/.screenlayout/conference-room.sh"))
 
 (define-key *screen-map* (kbd "h") "home-display-layout")
 (define-key *screen-map* (kbd "o") "office-display-layout")
@@ -206,168 +225,41 @@
   ;;(run-shell-command "xscreensaver")
   (setf %run-once% t))
 
-(run-shell-command "synclient VerScrollDelta=-53")
+(run-shell-command "synclient VertScrollDelta=-53")
 (run-shell-command "feh --bg-tile ~/Pictures/geomatrix.png")
 
 ;; dbus-send --system --print-reply     --dest="org.freedesktop.UPower"     /org/freedesktop/UPower     org.freedesktop.UPower.Suspend
 
-;; the mode-line is kinda nice
-(setf *screen-mode-line-format* "%d [^B%n^b] %W"
-      *time-modeline-string* "%d %b %y %H:%M"
-      *mode-line-timeout* 15)
+;; ;; the mode-line is kinda nice
+;; (setf *screen-mode-line-format* "%d [^B%n^b] %W"
+;;       *time-modeline-string* "%d %b %y %H:%M"
+;;       *mode-line-timeout* 15)
 
-;; let's enable it everywhere
-(defun enable-all-mode-lines ()
-  (loop for screen in *screen-list*
-        do (loop for head in (screen-heads screen)
-                 do (enable-mode-line screen head t))))
+;; ;; let's enable it everywhere
+;; (defun enable-all-mode-lines ()
+;;   (loop for screen in *screen-list*
+;;         do (loop for head in (screen-heads screen)
+;;                  do (enable-mode-line screen head t))))
 
-(enable-all-mode-lines)
+;; (defun toggle-all-mode-lines ()
+;;   (loop for screen in *screen-list*
+;;         do (loop for head in (screen-heads screen)
+;;                  do (toggle-mode-line screen head t))))
 
-(defvar !old-group-sync-all-heads!
-  (first (remove-if-not
-          #'(lambda (x) (and (equalp (sb-mop:method-qualifiers x) '(:after))
-                             (equalp (sb-mop:method-specializers x) (list (find-class 'group)))))
-          (sb-mop:generic-function-methods #'group-sync-all-heads))))
+;; ;; (toggle-all-mode-lines)
+;; (enable-all-mode-lines)
+
+;; (defvar !old-group-sync-all-heads!
+;;   (first (remove-if-not
+;;           #'(lambda (x) (and (equalp (sb-mop:method-qualifiers x) '(:after))
+;;                              (equalp (sb-mop:method-specializers x) (list (find-class 'group)))))
+;;           (sb-mop:generic-function-methods #'group-sync-all-heads))))
 
 ;; update mode lines when the screen heads change
 
-(defmethod group-sync-all-heads :after ((group group))
-  (when !old-group-sync-all-heads!
-    (funcall !old-group-sync-all-heads! group))
-  (enable-all-mode-lines))
+;; (defmethod group-sync-all-heads :after ((group group))
+;;   (when !old-group-sync-all-heads!
+;;     (funcall !old-group-sync-all-heads! group))
+;;   (enable-all-mode-lines))
 
-;; use Zenburn colours
-;; default: ("black" "red" "green" "yellow" "blue" "magenta" "cyan" "white")
-(setf *colors* '("#3f3f3f" "#cc9393" "#7f9f7f" "#f0dfaf"
-                 "#8cd0d3" "#dc8cc3" "#93e0e3" "#dcdccc"))
-(update-color-map (current-screen))
-
-(let (;;(foreground-colour "darkseagreen1")
-      (foreground-colour "#dcdccc")
-      ;;(background-colour "grey25")
-      (background-colour "#3f3f3f")
-      ;;(border-colour "grey26")
-      (border-colour "#2b2b2b")
-      ;;(focus-colour "darkseagreen4")
-      (focus-colour "#4f4f4f")
-      ;;(unfocus-colour "grey25")
-      (unfocus-colour "#383838"))
-  (set-fg-color foreground-colour)
-  (set-border-color foreground-colour)
-  (set-focus-color focus-colour)
-  (set-float-focus-color "#dfaf8f")
-  (set-unfocus-color unfocus-colour)
-  (set-float-unfocus-color "#366060")
-  (set-msg-border-width 1)
-  (setf *mode-line-foreground-color* "#5f5f5f"
-        *mode-line-background-color* "#2b2b2b"
-        *mode-line-border-color* border-colour))
-
-;; An example of catching dbus lock messages.  This blocks until a message is received.
-;;
-;; (dbus:with-open-bus (bus (dbus:system-server-addresses)) (dbus:add-match bus :type :signal :interface "org.freedesktop.login1.Session" :member "Lock") (dbus:receive-message (dbus:bus-connection bus) ))
-
-;; (let ((xdg-session (getenv "XDG_SESSION_ID")))
-;;   (when (and xdg-session (string/= xdg-session ""))
-;;     (bordeaux-threads:make-thread
-;;      (dbus:with-open-bus (bus (dbus:system-server-addresses))
-;;        (dbus:with-introspected-object (logind
-;;                                        bus
-;;                                        "/org/freedesktop/login1"
-;;                                        "org.freedesktop.login1")
-;;          (dbus:add-match bus
-;;                          :type :signal
-;;                          :interface "org.freedesktop.login1.Session"
-;;                          :member "Lock"
-;;                          :path (logind
-;;                                 "org.freedesktop.login1.Manager"
-;;                                 "GetSession"
-;;                                 xdg-session))
-;;          (dbus:add-match bus
-;;                          :type :signal
-;;                          :interface "org.freedesktop.login1.Session"
-;;                          :member "Unlock"
-;;                          :path (logind
-;;                                 "org.freedesktop.login1.Manager"
-;;                                 "GetSession"
-;;                                 xdg-session))
-;;          (loop for message = (dbus:receive-message (dbus:bus-connection bus))
-;;             for member = (dbus:message-member message)
-;;             do (cond
-;;                  ((string= member "Lock") (lock-screen))
-;;                  ((string= member "Unlock" (unlock-screen)))))))
-;;      :name "handle-logind-locks")))
-
-;; (bt:make-thread
-;;  (lambda ()
-;;    (dbus:with-open-bus (bus (dbus:system-server-addresses))
-;;      (dbus:with-introspected-object (logind bus "/org/freedesktop/login1" "org.freedesktop.login1")
-;;        (let ((session (stumpwm:getenv "XDG_SESSION_ID"))
-;;              session-path)
-;;          (when (and session (string/= session ""))
-;;            (setf session-path
-;;                  (logind "org.freedesktop.login1.Manager" "GetSession" session))
-;;            (dbus:add-match bus :type :signal :interface "org.freedesktop.login1.Session" :member "Lock" :path session-path)))
-;;        (dbus:add-match bus :type :signal :interface "org.freedesktop.login1.Manager" :member "PrepareForSleep")
-;;        (loop for message = (dbus:receive-message (dbus:bus-connection bus))
-;;           do (let ((member (dbus:message-member message)))
-;;                (cond
-;;                  ((and (string= member "PrepareForSleep")
-;;                        (null (first (dbus:message-body message))))
-;;                   (lock-screen))
-;;                  ((string= member "Lock") (lock-screen))))))))
-;;  :name "lock-on-dbus-signals")
-
-(defcommand suspend () ()
-  "suspend laptop"
-  (lock-screen)
-  (run-shell-command "dbus-send --system --print-reply --dest=org.freedesktop.login1 /org/freedesktop/login1 \"org.freedesktop.login1.Manager.Suspend\" boolean:true"))
-
-(defcommand hibernate () ()
-  "hibernate laptop"
-  (lock-screen)
-  (run-shell-command "dbus-send --system --print-reply --dest=org.freedesktop.login1 /org/freedesktop/login1 \"org.freedesktop.login1.Manager.Hibernate\" boolean:true"))
-
-(ql:quickload :split-sequence)
-
-;; (defvar *xdg-config-dirs*
-;;   (append
-;;    (let ((xdg-config-home (sb-ext:posix-getenv "XDG_CONFIG_HOME")))
-;;      (if (and xdg-config-home (string/= "" xdg-config-home))
-;;          (list (uiop/pathname:parse-unix-namestring xdg-config-home :type :directory))
-;;          (list (parse-namestring (merge-pathnames ".config/" (user-homedir-pathname))))))
-;;    (let ((xdg-config-dirs (sb-ext:posix-getenv "XDG_CONFIG_DIRS")))
-;;     (if (and xdg-config-dirs (string/= "" xdg-config-dirs))
-;;         (mapcar (lambda (x)
-;;                   (uiop/pathname:parse-unix-namestring x :type :directory))
-;;                 (split-sequence:split-sequence #\: xdg-config-dirs))
-;;         (list (parse-namestring "/etc/xdg/"))))))
-
-;; (defun search-paths (relative-path paths)
-;;   (loop for path in paths
-;;      for test-path = (merge-pathnames relative-path path)
-;;      do (print test-path)
-;;      when (uiop/filesystem:file-exists-p test-path)
-;;     return test-path))
-
-;;(search-paths "menus/applications.menu" *xdg-config-dirs*)
-
-;; (dbus:with-open-bus (bus (dbus:system-server-addresses))
-;;   (dbus:with-introspected-object (notifications bus "/org/freedesktop/login1" "org.freedesktop.login1")
-;;     (notifications "org.freedesktop.login1.Manager" "Inhibit" "sleep" "Stump!" "testing" "block")))
-
-;; brown noise: play -n synth 60:00 brownnoise
-
-(defcommand darken-screen () ()
-  "darken screen"
-  (run-shell-command "xbacklight -dec 10"))
-
-(defcommand lighten-screen () ()
-  "lighten screen"
-  (run-shell-command "xbacklight -inc 10"))
-
-(define-key *top-map* (kbd "XF86MonBrightnessUp") "lighten-screen")
-(define-key *top-map* (kbd "XF86MonBrightnessDown") "darken-screen")
-
-(run-shell-command "xrandr --dpi 106")
+;; switch to other user: dbus-send --system --print-reply --dest=org.gnome.DisplayManager /org/gnome/DisplayManager/LocalDisplayFactory "org.gnome.DisplayManager.LocalDisplayFactory.CreateTransientDisplay"
