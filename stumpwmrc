@@ -190,7 +190,7 @@
   "Start an stterm or switch to it, if it is already running."
   (let ((instance (or (cdr (assoc (group-name (current-group)) *group-to-st-instance-alist* :test #'string=))
                       *default-st-instance*)))
-    (run-or-raise (format nil "st -c stterm-buhl -n \"~a\" -e tmux new-session -A -s \"~a\"" instance instance)
+    (run-or-raise (format nil "st -n \"~a\" -e tmux new-session -A -s \"~a\"" instance instance)
                   `(:instance ,instance ))))
 
 (define-key *root-map* (kbd "c") "stterm")
@@ -217,26 +217,24 @@
 
 (defcommand home-display-layout () ()
   "Switch to my home display setup (portrait + laptop)"
-  (run-shell-command "/home/buhl/.screenlayout/home.sh"))
+  (run-shell-command (namestring (uiop:merge-pathnames* ".screenlayout/home.sh" (user-homedir-pathname)))))
 
 (defcommand office-display-layout () ()
   "Switch to my office display setup (portrait + landscape)"
-  (run-shell-command "/home/buhl/.screenlayout/office.sh"))
+  (run-shell-command (namestring (uiop:merge-pathnames* ".screenlayout/office.sh" (user-homedir-pathname)))))
 
 (defcommand standalone-display-layout () ()
   "Switch to laptop-only display"
-  (run-shell-command "/home/buhl/.screenlayout/standalone.sh"))
+  (run-shell-command (namestring (uiop:merge-pathnames* ".screenlayout/standalone.sh" (user-homedir-pathname)))))
 
 (defcommand conference-room-display-layout () ()
   "Switch to conference-room display"
-  (run-shell-command "/home/buhl/.screenlayout/conference-room.sh"))
+  (run-shell-command (namestring (uiop:merge-pathnames* ".screenlayout/conference-room.sh" (user-homedir-pathname)))))
 
 (define-key *screen-map* (kbd "h") "home-display-layout")
 (define-key *screen-map* (kbd "o") "office-display-layout")
 (define-key *screen-map* (kbd "s") "standalone-display-layout")
 (define-key *screen-map* (kbd "c") "conference-room-display-layout")
-
-;;(run-shell-command "/home/buhl/bin/xflux -z 80203 -r 1")
 
 (defvar %run-once% nil)
 
