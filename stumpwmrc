@@ -4,11 +4,10 @@
 
 (require :asdf)
 
-     ;;; If a fasl was stale, try to recompile and load (once).
+;;; If a fasl was stale, try to recompile and load (once).
 (defmethod asdf:perform :around ((o asdf:load-op)
                                  (c asdf:cl-source-file))
   (handler-case (call-next-method o c)
-    ;; If a fasl was stale, try to recompile and load (once).
     (sb-ext:invalid-fasl ()
       (asdf:perform (make-instance 'asdf:compile-op) c)
       (call-next-method))))
@@ -52,11 +51,16 @@
   (add-hook stumpwm::*restart-hook* (lambda () (when server-running (swank:stop-server 4005)))))
 
 (handler-case (swank)
+  ;; Don't crash StumpWM if it's restarted with the swank socket open
+  ;; (even though this itself is a bad thing).
   (sb-bsd-sockets:address-in-use-error () (continue)))
 
+;; This is the beginning of using Super to manipulate StumpWM rather than C-1
 (define-key *top-map* (kbd "s-w") "windows")
 (define-key *top-map* (kbd "s-!") "exec")
 
+;; This is so much better than C-t, but it's not ideal.  More stuff
+;; needs to hang off of Super.
 (set-prefix-key (kbd "C-1"))
 
 (setf *mouse-focus-policy* :click) ;; :click, :ignore, :sloppy
@@ -65,19 +69,25 @@
   "run chromium"
   (run-or-raise "chromium-browser" '(:instance "Chromium")))
 
+(defparameter *group-to-firefox-profile-alist* nil)
+
+(defparameter *default-firefox-profile* "Default")
+
 (defcommand firefox () ()
   "run firefox"
-  (if (string= (group-name (current-group)) "AIaaS")
-      (run-or-raise "firefox -new-instance -P \"AIaaS\" --class \"Firefox-AIaaS\"" '(:class "Firefox-AIaaS"))
-      (run-or-raise "firefox -new-instance -P \"Reset\" --class \"Firefox-Default\"" '(:class "Firefox-Default"))))
+  (let ((profile (or (cdr (assoc (group-name (current-group)) *group-to-firefox-profile-alist* :test #'string=))
+                     *default-firefox-profile*)))
+    (run-or-raise (format nil "firefox -new-instance -P \"~a\" --class \"Firefox-~a\"" profile profile)
+                  `(:class ,(format nil "Firefox-~a" profile)))))
 
 (define-key *top-map* (kbd "C-M-6") "firefox")
 
-(defcommand conkeror () ()
-  "run conkeror"
-  (run-or-raise "conkeror" '(:class "Conkeror")))
+;;; conkeror was awesome, but it's just too flaky☹
+;; (defcommand conkeror () ()
+;;   "run conkeror"
+;;   (run-or-raise "conkeror" '(:class "Conkeror")))
 
-(define-key *top-map* (kbd "C-M-8") "conkeror")
+;; (define-key *top-map* (kbd "C-M-8") "conkeror")
 
 (defcommand virtualbox () ()
   "switch to VirtualBox"
@@ -85,15 +95,17 @@
 
 (define-key *top-map* (kbd "C-M-4") "virtualbox")
 
-(defcommand pidgin-chat-window () ()
-  "Raise pidgin-chat-window"
-  (run-or-raise "pidgin" '(:class "Pidgin" :role "conversation")))
+;;; I don't use Pidgin anymore.
 
-;; (define-key *top-map* (kbd "C-M-2") "pidgin-chat-window")
+;; (defcommand pidgin-chat-window () ()
+;;   "Raise pidgin-chat-window"
+;;   (run-or-raise "pidgin" '(:class "Pidgin" :role "conversation")))
 
-(defcommand pidgin () ()
-  "Run pidgin"
-  (run-or-raise "pidgin" '(:class "Pidgin" :role "buddy_list")))
+;; ;; (define-key *top-map* (kbd "C-M-2") "pidgin-chat-window")
+
+;; (defcommand pidgin () ()
+;;   "Run pidgin"
+;;   (run-or-raise "pidgin" '(:class "Pidgin" :role "buddy_list")))
 
 (defcommand start-emacs () ()
   "start emacs dæmon"
@@ -103,23 +115,28 @@
   "stop emacs dæmon"
   (run-shell-command "emacsclient -e '(save-buffers-kill-emacs)'"))
 
+;; emacs should always be running: M-x all-hail emacs
 (start-emacs)
 
 (add-hook *quit-hook* #'stop-emacs)
 
-;;(let ((sb-ext:run-program "/usr/bin/env" '("emacs" "--daemon"))))
+;;; TODO: it'd be awesome if this could be unified with the
+;;; group-based Firefox stuff above.
+(defparameter *group-to-emacs-frame-alist* nil)
+
+(defparameter *default-emacs-frame* "emacs$")
 
 (defcommand emacs () ()
   "run emacs"
-  (if (string= (group-name (current-group)) "AIaaS")
-      (run-or-raise "/usr/local/bin/emacsclient -c -F '((name . \"emacs-aiaas\"))' -a ''" '(:instance "emacs-aiaas"))
-      (run-or-raise "/usr/local/bin/emacsclient -c -a ''" '(:instance "emacs"))))
+  (let ((frame (or (cdr (assoc (group-name (current-group)) *group-to-emacs-frame-alist* :test #'string=))
+                     *default-emacs-frame*)))
+    ;; FIXME: this will break if the emacs frame name contains a single quote.
+    (run-or-raise (format nil "/usr/local/bin/emacsclient -c -F '((name . \"~a\"))' -a ''" frame)
+                  `(:instance ,frame))))
 
 (defcommand conkeror () ()
   "run conkeror"
   (run-or-raise "/usr/local/bin/conkeror" '(:class "Conkeror")))
-
-;;(define-key *top-map* (kbd "C-M-8") "pidgin")
 
 #|
 ;; Show time, cpu usage and network traffic in the modeline
@@ -152,19 +169,29 @@
 ;; (define-frame-preference "Web"
 ;;     (0 t t :class "Chromium-browser"))
 
-(defcommand urxvt () ()
-  "Start an urxvt instance or switch to it, if it is already running."
-  (run-or-raise "urxvt" '(:instance "urxvt")))
-(define-key *root-map* (kbd "c") "urxvt")
-(defcommand gnome-terminal () ()
-  "Start an gnome-terminal instance or switch to it, if it is already running."
-  (run-or-raise "gnome-terminal" '(:instance "gnome-terminal")))
-(define-key *root-map* (kbd "c") "gnome-terminal")
+;; (defcommand urxvt () ()
+;;   "Start an urxvt instance or switch to it, if it is already running."
+;;   (run-or-raise "urxvt" '(:instance "urxvt")))
+;; (define-key *root-map* (kbd "c") "urxvt")
+;; (defcommand gnome-terminal () ()
+;;   "Start an gnome-terminal instance or switch to it, if it is already running."
+;;   (run-or-raise "gnome-terminal" '(:instance "gnome-terminal")))
+;; (define-key *root-map* (kbd "c") "gnome-terminal")
+
+;;; TODO: it'd be _really_ awesome were this unified with the
+;;; group-based Firefox & emacs stuff above.  I don't know if the
+;;; StumpWM placement preferences are able to handle this sort of
+;;; thing.  _Maybe_ it can support the st rule?
+(defparameter *group-to-st-instance-alist* nil)
+
+(defparameter *default-st-instance* "Default")
+
 (defcommand stterm () ()
   "Start an stterm or switch to it, if it is already running."
-  (if (string= (group-name (current-group)) "AIaaS")
-      (run-or-raise "st -c stterm-buhl -n \"AIaaS\" -e tmux new-session -A -s aiaas" '(:class "stterm-buhl" :instance "AIaaS"))
-      (run-or-raise "st -c stterm-buhl -n \"Default\"  -e tmux new-session -A" '(:class "stterm-buhl" :instance "Default"))))
+  (let ((instance (or (cdr (assoc (group-name (current-group)) *group-to-st-instance-alist* :test #'string=))
+                      *default-st-instance*)))
+    (run-or-raise (format nil "st -c stterm-buhl -n \"~a\" -e tmux new-session -A -s \"~a\"" instance instance)
+                  `(:instance ,instance ))))
 
 (define-key *root-map* (kbd "c") "stterm")
 
@@ -263,3 +290,6 @@
 ;;   (enable-all-mode-lines))
 
 ;; switch to other user: dbus-send --system --print-reply --dest=org.gnome.DisplayManager /org/gnome/DisplayManager/LocalDisplayFactory "org.gnome.DisplayManager.LocalDisplayFactory.CreateTransientDisplay"
+
+(loop for file in (uiop:directory* (uiop:merge-pathnames* "*.lisp" (uiop:xdg-config-home "stumpwm/")))
+      do (load file))
