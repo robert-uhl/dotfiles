@@ -223,6 +223,12 @@
 
 (global-set-key "\C-cs" 'slime-selector)
 
+(eval-after-load 'nov
+  (add-to-list 'auto-mode-alist '("\\.epub\\'" . nov-mode))
+  (setq nov-text-width 80))
+
+(setenv "PASSWORD_STORE_CHARACTER_SET" "[:alnum:]")
+
 (provide 'buhl)
 
 ;;; buhl.el ends here
