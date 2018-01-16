@@ -8,6 +8,8 @@
 
 ;;; Code:
 
+(load-theme 'nord t)
+
 ;; FIXME: install flycheck-gometalinter
 ;;(set-frame-font "Source Code Pro:pixelsize=18:antialias=true:autohint=true")
 (setq default-frame-alist '((font . "Source Code Pro:pixelsize=18:antialias=true:autohint=true")))

@@ -131,7 +131,7 @@
 ;;; group-based Firefox stuff above.
 (defparameter *group-to-emacs-frame-alist* nil)
 
-(defparameter *default-emacs-frame* "emacs$")
+(defparameter *default-emacs-frame* "emacs")
 
 (defcommand emacs () ()
   "run emacs"
@@ -298,3 +298,9 @@
 
 (loop for file in (uiop:directory* (uiop:merge-pathnames* "*.lisp" (uiop:xdg-config-home "stumpwm/")))
       do (load file))
+
+(set-fg-color "#D8DEE9")
+(set-bg-color "#2e3440")
+(setf *colors*
+      '("#2e3440" "#bf616a" "#a3be8c" "#ebcb8b" "#81a1c1" "#b48ead" "#8fbcbb" "#d8dee9"))
+(mapcar #'update-color-map *screen-list*)
