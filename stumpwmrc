@@ -2,6 +2,8 @@
 ;debian=sbcl
 (in-package :stumpwm-user)
 
+
+
 (require :asdf)
 
 ;;; If a fasl was stale, try to recompile and load (once).
@@ -19,6 +21,7 @@
                 :dbus
                 "local-time"))
 
+(push #P"/home/buhl/.local/share/fonts/" xft:*font-dirs*)
 (set-font (make-instance 'xft:font :family "Source Code Pro Semibold" :subfamily "Regular" :size 12))
 
 (ql:quickload :swank)
@@ -162,6 +165,14 @@
 |#
 
 (clear-window-placement-rules)
+;;(gnew-float "GIMP")
+
+;;(define-frame-preference "GIMP"
+  ;;(1 t t :create "gimp-dump" :class "Gimp" :title nil :role nil)
+  ;;(0 t t :create "gimp-dump" :class "Gimp" :title nil :role "gimp-toolbox")
+  ;;(2 t t :create "gimp-dump" :class "Gimp" :title nil :role "gimp-dock")
+  ;;(1 t t :create "gimp-dump" :class "Gimp" :title nil :role "gimp-image-window"))
+
 ;; (gnew "Terminal")
 ;; (gnew "Development")
 ;; (gnew "Web")
@@ -234,6 +245,8 @@
   "Switch to laptop-only display"
   (run-shell-command (namestring (uiop:merge-pathnames* ".screenlayout/standalone.sh" (user-homedir-pathname)))))
 
+(standalone-display-layout)
+
 (defcommand conference-room-display-layout () ()
   "Switch to conference-room display"
   (run-shell-command (namestring (uiop:merge-pathnames* ".screenlayout/conference-room.sh" (user-homedir-pathname)))))
@@ -243,13 +256,28 @@
 (define-key *screen-map* (kbd "s") "standalone-display-layout")
 (define-key *screen-map* (kbd "c") "conference-room-display-layout")
 
+(defvar *super-map* (make-sparse-keymap))
+
+(define-key *top-map* (kbd "s-x") '*super-map*)
+
+(define-key *super-map* (kbd "0") "remove")
+
+(define-key *super-map* (kbd "1") "only")
+
+(define-key *super-map* (kbd "2") "vsplit")
+
+(define-key *super-map* (kbd "3") "hsplit")
+
+(define-key *super-map* (kbd "o") "fnext")
+
 (defvar %run-once% nil)
 
 ;; consider running dbus-launch and setting vars…
 
 (unless %run-once%
-  (run-shell-command "redshift -l 39.615186:-104.895381")
-  (run-shell-command "exec xautolock -locker \"xset dpms 900 1200 1800 & (slock && xset -dpms) \" -corners 0-00 -time 5")
+  (run-shell-command "xsettingsd")
+  (run-shell-command "redshift -l 38.810589:-77.144605")
+  (run-shell-command "exec xautolock -locker \"zsh -c 'xset dpms 900 1200 1800 & (slock && xset -dpms)' \" -corners 0-00 -time 5")
   ;; FIXME: can CLX handle this xset bit?
   ;;(run-shell-command "xset +dpms dpms 300 600 900")
   (run-shell-command "nm-applet --sm-disable")
