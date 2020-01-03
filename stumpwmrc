@@ -77,7 +77,7 @@
 
 (defcommand chromium () ()
   "run chromium"
-  (run-or-raise "chromium-browser" '(:instance "Chromium")))
+  (run-or-raise "chromium-browser" '(:class "Chromium-browser")))
 
 (defparameter *group-to-firefox-profile-alist* nil)
 
@@ -257,18 +257,22 @@
 (define-key *screen-map* (kbd "c") "conference-room-display-layout")
 
 (defvar *super-map* (make-sparse-keymap))
-
 (define-key *top-map* (kbd "s-x") '*super-map*)
-
 (define-key *super-map* (kbd "0") "remove")
-
 (define-key *super-map* (kbd "1") "only")
-
 (define-key *super-map* (kbd "2") "vsplit")
-
 (define-key *super-map* (kbd "3") "hsplit")
-
 (define-key *super-map* (kbd "o") "fnext")
+
+(define-key *top-map* (kbd "C-s-Left") "move-window left")
+(define-key *top-map* (kbd "C-s-Right") "move-window right")
+(define-key *top-map* (kbd "C-s-Up") "move-window up")
+(define-key *top-map* (kbd "C-s-Down") "move-window down")
+
+(define-key *top-map* (kbd "s-c") "stterm")
+(define-key *top-map* (kbd "s-e") "emacs")
+(define-key *top-map* (kbd "s-w") "firefox")
+(define-key *top-map* (kbd "C-s-w") "chromium")
 
 (defvar %run-once% nil)
 
