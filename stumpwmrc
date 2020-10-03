@@ -75,9 +75,9 @@
 
 (setf *mouse-focus-policy* :click) ;; :click, :ignore, :sloppy
 
-(defcommand chromium () ()
+(defcommand chrome () ()
   "run chromium"
-  (run-or-raise "chromium-browser" '(:class "Chromium-browser")))
+  (run-or-raise "google-chrome" '(:class "Google-chrome")))
 
 (defparameter *group-to-firefox-profile-alist* nil)
 
@@ -257,6 +257,7 @@
 (define-key *screen-map* (kbd "c") "conference-room-display-layout")
 
 (defvar *super-map* (make-sparse-keymap))
+(define-key *top-map* (kbd "C-M-s-X") '*super-map*)
 (define-key *top-map* (kbd "s-x") '*super-map*)
 (define-key *super-map* (kbd "0") "remove")
 (define-key *super-map* (kbd "1") "only")
@@ -265,14 +266,27 @@
 (define-key *super-map* (kbd "o") "fnext")
 
 (define-key *top-map* (kbd "C-s-Left") "move-window left")
+(define-key *top-map* (kbd "C-M-s-S-Left") "move-window left")
 (define-key *top-map* (kbd "C-s-Right") "move-window right")
+(define-key *top-map* (kbd "C-M-s-S-Right") "move-window right")
 (define-key *top-map* (kbd "C-s-Up") "move-window up")
+(define-key *top-map* (kbd "C-M-s-S-Up") "move-window up")
 (define-key *top-map* (kbd "C-s-Down") "move-window down")
+(define-key *top-map* (kbd "C-M-s-S-Down") "move-window down")
+
+(define-key *top-map* (kbd "s-e") "move-focus up")
+(define-key *top-map* (kbd "C-s-e") "move-window up")
+(define-key *top-map* (kbd "s-d") "move-focus down")
+(define-key *top-map* (kbd "C-s-d") "move-window down")
+(define-key *top-map* (kbd "s-s") "move-focus left")
+(define-key *top-map* (kbd "C-s-s") "move-window left")
+(define-key *top-map* (kbd "s-f") "move-focus right")
+(define-key *top-map* (kbd "C-s-f") "move-window right")
 
 (define-key *top-map* (kbd "s-c") "stterm")
 (define-key *top-map* (kbd "s-e") "emacs")
 (define-key *top-map* (kbd "s-w") "firefox")
-(define-key *top-map* (kbd "C-s-w") "chromium")
+(define-key *top-map* (kbd "C-s-w") "chrome")
 
 (defvar %run-once% nil)
 
@@ -290,7 +304,7 @@
   (setf %run-once% t))
 
 (run-shell-command "synclient VertScrollDelta=-53")
-(run-shell-command "feh --bg-tile ~/Pictures/geomatrix.png")
+(run-shell-command "feh --bg-tile ~/Pictures/geomatrix-nord.png")
 
 ;; dbus-send --system --print-reply     --dest="org.freedesktop.UPower"     /org/freedesktop/UPower     org.freedesktop.UPower.Suspend
 
