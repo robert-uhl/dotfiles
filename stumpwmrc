@@ -83,12 +83,14 @@
 
 (defparameter *default-firefox-profile* "Default")
 
-(defcommand firefox () ()
+(defcommand firefox (&optional url) ((:string))
   "run firefox"
   (let ((profile (or (cdr (assoc (group-name (current-group)) *group-to-firefox-profile-alist* :test #'string=))
                      *default-firefox-profile*)))
     (run-or-raise (format nil "firefox -new-instance -P \"~a\" --class \"Firefox-~a\"" profile profile)
-                  `(:class ,(format nil "Firefox-~a" profile)))))
+                  `(:class ,(format nil "Firefox-~a" profile)))
+    (when url
+      (run-shell-command (format nil "firefox -new-tab ~a" (puri:parse-uri url))))))
 
 (define-key *top-map* (kbd "C-M-6") "firefox")
 
@@ -350,3 +352,34 @@
 (setf *colors*
       '("#2e3440" "#bf616a" "#a3be8c" "#ebcb8b" "#81a1c1" "#b48ead" "#8fbcbb" "#d8dee9"))
 (mapcar #'update-color-map *screen-list*)
+
+(defvar *plumbing* nil "List of (FILTER . FUNCTION) pairs.  FILTER should return true if FUNCTION may be called on its single argument.  FUNCTION takes a single argument.")
+
+(defun rau/get-x-selection (&optional timeout (selection stumpwm::*default-selections*))
+  "Get the X selection and also information about it.
+
+Taken from STUMPWM:GET-X-SELECTION."
+  (let ((selection (if (listp selection) (car selection) selection)))
+    (labels ((wait-for-selection (&rest event-slots &key display event-key &allow-other-keys)
+               (declare (ignore display))
+               (when (eq event-key :selection-notify)
+                 (destructuring-bind (&key window property &allow-other-keys) event-slots
+                   (if property
+                       (stumpwm::utf8-to-string (xlib:get-property window property :type :utf8_string :result-type 'vector :delete-p t))
+                       "")))))
+      (or (getf *x-selection* selection)
+          (progn
+            (xlib:convert-selection selection :utf8_string (stumpwm::screen-input-window (current-screen)) :stumpwm-selection)
+            ;; Note: this may spend longer than timeout in this loop but it will eventually return.
+            (let ((time (get-internal-real-time)))
+              (loop for ret = (xlib:process-event *display* :handler #'wait-for-selection :timeout timeout :discard-p nil)
+                    when (or ret
+                             (> (/ (- time (get-internal-real-time)) internal-time-units-per-second)
+                                timeout))
+                      ;; make sure we return a string
+                      return (or ret ""))))))))
+
+;; (load-module "swm-gaps")
+;; (setq swm-gaps:*inner-gaps-size* 6
+;;       swm-gaps:*outer-gaps-size* 8)
+;; (swm-gaps:toggle-gaps-off)
