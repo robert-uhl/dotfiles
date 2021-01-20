@@ -1,0 +1,36 @@
+#!/bin/sh
+
+if test "x$XDG_CONFIG_HOME" = "x"
+then
+    BASEDIR="$HOME/.config/stumpwm"
+else
+    BASEDIR="$XDG_CONFIG_HOME/stumpwm"
+fi
+
+if test "x$DISPLAY" = "x"
+then
+    echo "$0: starting X server"
+    prog=xinit
+else
+    echo "$0: X server already running on display $DISPLAY"
+    prog=/bin/sh
+fi
+
+if [ -f "$HOME/.xserverrc" ]; then
+    SERVERRC="$HOME/.xserverrc $SERVERRC"
+elif [ -f /etc/X11/xinit/xserverrc ]; then
+    SERVERRC="/etc/X11/xinit/xserverrc $SERVERRC"
+fi
+
+if test ! "x$SERVERRC" = "x"
+then
+    SERVERRC="-- $SERVERRC"
+fi
+
+
+if [ -f $BASEDIR/xinitrc ]; then
+    exec $prog $BASEDIR/xinitrc $CLIENTRC $SERVERRC
+else
+    exec $prog /usr/local/etc/xdg/stumpwm/xinitrc $CLIENTRC $SERVERRC
+fi
+/usr/local/bin/stumpwm
