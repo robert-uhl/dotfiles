@@ -302,6 +302,7 @@
   ;;(run-shell-command "xset +dpms dpms 300 600 900")
   (run-shell-command "nm-applet --sm-disable")
   (run-shell-command "xbacklight -set 76")
+  (run-shell-command "ibus-daemon --xim -d")
   ;;(run-shell-command "xscreensaver")
   (setf %run-once% t))
 
